@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Pro Video Streaming Player</title>
+		<link
+			href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"
+			rel="stylesheet"
+		/>
+		<link
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+			rel="stylesheet"
+		/>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+		<style>
+			@import url('https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600&display=swap');
+
+			:root {
+				--primary-color: #007bff;
+				--dark-bg: #121212;
+				--darker-bg: #0a0a0a;
+				--card-bg: #1e1e1e;
+			}
+
+			body {
+				background-color: var(--dark-bg);
+				font-family: 'Fira Sans', sans-serif;
+				color: #fff;
+			}
+
+			.video-container {
+				background: var(--darker-bg);
+				border-radius: 8px;
+				overflow: hidden;
+				position: relative;
+			}
+
+			.video-player {
+				width: 100%;
+				aspect-ratio: 16/9;
+				background: #000;
+			}
+
+			.playlist-card {
+				background: var(--card-bg);
+				border-radius: 8px;
+				border: 1px solid rgba(255, 255, 255, 0.1);
+			}
+
+			.playlist-item {
+				background: transparent;
+				border: none;
+				color: #fff;
+				padding: 1rem;
+				width: 100%;
+				text-align: left;
+				border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+				transition: all 0.3s ease;
+			}
+
+			.playlist-item:hover {
+				background: rgba(255, 255, 255, 0.1);
+				color: var(--primary-color);
+			}
+
+			.playlist-item.active {
+				background: rgba(0, 123, 255, 0.2);
+				color: var(--primary-color);
+				font-weight: 500;
+			}
+
+			.controls-container {
+				background: rgba(0, 0, 0, 0.8);
+				padding: 1rem;
+				border-radius: 0 0 8px 8px;
+			}
+
+			.progress {
+				height: 5px;
+				background: rgba(255, 255, 255, 0.2);
+				cursor: pointer;
+				transition: height 0.2s ease;
+			}
+
+			.progress:hover {
+				height: 8px;
+			}
+
+			.progress-bar {
+				transition: width 0.1s ease;
+			}
+
+			.quality-selector {
+				background: var(--card-bg);
+				color: #fff;
+				border: 1px solid rgba(255, 255, 255, 0.2);
+			}
+
+			.quality-selector option {
+				background: var(--card-bg);
+			}
+
+			.buffer-indicator {
+				position: absolute;
+				bottom: 0;
+				left: 0;
+				height: 3px;
+				background: rgba(255, 255, 255, 0.3);
+				width: 100%;
+				z-index: 10;
+			}
+
+			.buffer-progress {
+				height: 100%;
+				background: rgba(255, 255, 255, 0.5);
+				width: 0%;
+				transition: width 0.3s ease;
+			}
+
+			.quality-indicator {
+				position: absolute;
+				top: 10px;
+				right: 10px;
+				background: rgba(0, 0, 0, 0.7);
+				padding: 4px 8px;
+				border-radius: 4px;
+				font-size: 12px;
+				color: white;
+				z-index: 20;
+			}
+
+			.btn-link {
+				text-decoration: none;
+			}
+
+			.btn-link:hover {
+				color: var(--primary-color) !important;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container-fluid py-4">
+			<div class="row g-4">
+				<!-- Video Player Column -->
+				<div class="col-lg-9">
+					<div class="video-container shadow">
+						<video id="videoPlayer" class="video-player"></video>
+
+						<!-- Custom Controls -->
+						<div class="controls-container">
+							<!-- Progress Bar -->
+							<div class="progress mb-3" id="progressBar">
+								<div class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+							</div>
+
+							<div class="d-flex align-items-center justify-content-between">
+								<div class="d-flex align-items-center gap-3">
+									<button class="btn btn-link text-white" id="playPauseBtn">
+										<i class="fas fa-play"></i>
+									</button>
+									<button class="btn btn-link text-white" id="muteBtn">
+										<i class="fas fa-volume-up"></i>
+									</button>
+									<div class="d-flex align-items-center gap-2">
+										<span id="currentTime">0:00</span>
+										<span>/</span>
+										<span id="duration">0:00</span>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-center gap-3">
+									<select class="form-select quality-selector" id="qualitySelector">
+										<option value="auto">Auto</option>
+										<option value="1080">1080p</option>
+										<option value="720">720p</option>
+										<option value="480">480p</option>
+										<option value="360">360p</option>
+									</select>
+									<button class="btn btn-link text-white" id="fullscreenBtn">
+										<i class="fas fa-expand"></i>
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Video Title and Description -->
+					<div class="mt-4">
+						<h1 id="videoTitle" class="h3 mb-3">Select a video to play</h1>
+						<div id="videoDescription" class="text-muted"></div>
+					</div>
+				</div>
+
+				<!-- Playlist Column -->
+				<div class="col-lg-3">
+					<div class="playlist-card">
+						<div class="p-3 border-bottom border-secondary">
+							<h5 class="mb-0">
+								<i class="fas fa-list-ul me-2"></i>
+								Playlist
+							</h5>
+						</div>
+						<div id="playlist" class="playlist-container"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+		<script>
+			class VideoPlayerPro {
+				constructor() {
+					this.initializeElements();
+					this.initializeEventListeners();
+					this.initializeStreamingFeatures();
+					this.loadVideos();
+					this.currentQuality = 'auto';
+					this.videoBufferSize = 1024 * 1024 * 2; // 2MB buffer size
+				}
+
+				initializeElements() {
+					this.video = document.getElementById('videoPlayer');
+					this.playlist = document.getElementById('playlist');
+					this.progressBar = document.querySelector('.progress-bar');
+					this.playPauseBtn = document.getElementById('playPauseBtn');
+					this.muteBtn = document.getElementById('muteBtn');
+					this.fullscreenBtn = document.getElementById('fullscreenBtn');
+					this.qualitySelector = document.getElementById('qualitySelector');
+					this.currentTimeDisplay = document.getElementById('currentTime');
+					this.durationDisplay = document.getElementById('duration');
+					this.videoTitle = document.getElementById('videoTitle');
+				}
+
+				initializeStreamingFeatures() {
+					this.bufferIndicator = document.createElement('div');
+					this.bufferIndicator.className = 'buffer-indicator';
+					this.bufferIndicator.innerHTML = '<div class="buffer-progress"></div>';
+					this.video.parentElement.appendChild(this.bufferIndicator);
+
+					this.qualityIndicator = document.createElement('div');
+					this.qualityIndicator.className = 'quality-indicator';
+					this.video.parentElement.appendChild(this.qualityIndicator);
+				}
+
+				initializeEventListeners() {
+					this.video.addEventListener('timeupdate', () => this.updateProgress());
+					this.video.addEventListener('loadedmetadata', () => this.updateDuration());
+					this.video.addEventListener('play', () => this.updatePlayPauseIcon());
+					this.video.addEventListener('pause', () => this.updatePlayPauseIcon());
+					this.video.addEventListener('waiting', () => this.adaptQuality());
+					this.video.addEventListener('progress', () => this.updateBufferProgress());
+
+					this.playPauseBtn.addEventListener('click', () => this.togglePlay());
+					this.muteBtn.addEventListener('click', () => this.toggleMute());
+					this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+					this.qualitySelector.addEventListener('change', e => this.switchQuality(e.target.value));
+
+					document.querySelector('.progress').addEventListener('click', e => {
+						const rect = e.target.getBoundingClientRect();
+						const pos = (e.clientX - rect.left) / rect.width;
+						this.video.currentTime = pos * this.video.duration;
+					});
+				}
+
+				async loadVideos() {
+					try {
+						const response = await fetch('/api/videos');
+						const videos = await response.json();
+
+						this.playlist.innerHTML = videos
+							.map(
+								video => `
+                        <button class="playlist-item" 
+                                data-url="${video.url}"
+                                data-size="${video.size}"
+                                data-format="${video.format}">
+                            <i class="fas fa-play-circle me-2"></i>
+                            ${video.title}
+                            <small class="text-muted ms-2">${this.formatSize(video.size)}</small>
+                        </button>
+                    `
+							)
+							.join('');
+
+						this.setupPlaylistHandlers(videos);
+					} catch (error) {
+						console.error('Error loading videos:', error);
+					}
+				}
+
+				setupPlaylistHandlers(videos) {
+					this.playlist.addEventListener('click', async e => {
+						const button = e.target.closest('.playlist-item');
+						if (button) {
+							await this.startStreaming(button.dataset.url);
+							this.updateActiveItem(button);
+							this.videoTitle.textContent = button.textContent.trim();
+						}
+					});
+
+					if (videos.length > 0) {
+						this.startStreaming(videos[0].url);
+						this.updateActiveItem(this.playlist.firstElementChild);
+						this.videoTitle.textContent = videos[0].title;
+					}
+				}
+
+				async startStreaming(url) {
+					this.video.src = url;
+					this.updateQualityIndicator();
+				}
+
+				formatTime(seconds) {
+					const minutes = Math.floor(seconds / 60);
+					seconds = Math.floor(seconds % 60);
+					return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+				}
+
+				updateProgress() {
+					const progress = (this.video.currentTime / this.video.duration) * 100;
+					this.progressBar.style.width = `${progress}%`;
+					this.currentTimeDisplay.textContent = this.formatTime(this.video.currentTime);
+				}
+
+				updateDuration() {
+					this.durationDisplay.textContent = this.formatTime(this.video.duration);
+				}
+
+				updatePlayPauseIcon() {
+					const icon = this.playPauseBtn.querySelector('i');
+					icon.className = this.video.paused ? 'fas fa-play' : 'fas fa-pause';
+				}
+
+				togglePlay() {
+					if (this.video.paused) {
+						this.video.play();
+					} else {
+						this.video.pause();
+					}
+				}
+
+				toggleMute() {
+					this.video.muted = !this.video.muted;
+					const icon = this.muteBtn.querySelector('i');
+					icon.className = this.video.muted ? 'fas fa-volume-mute' : 'fas fa-volume-up';
+				}
+
+				toggleFullscreen() {
+					if (!document.fullscreenElement) {
+						this.video.requestFullscreen();
+					} else {
+						document.exitFullscreen();
+					}
+				}
+
+				adaptQuality() {
+					const bufferHealth = this.getBufferHealth();
+
+					if (bufferHealth < 0.3) {
+						this.switchQuality('360');
+					} else if (bufferHealth < 0.6) {
+						this.switchQuality('480');
+					} else if (bufferHealth < 0.8) {
+						this.switchQuality('720');
+					} else {
+						this.switchQuality('1080');
+					}
+				}
+
+				getBufferHealth() {
+					if (!this.video.buffered.length) return 0;
+					const bufferedEnd = this.video.buffered.end(this.video.buffered.length - 1);
+					const duration = this.video.duration;
+					return bufferedEnd / duration;
+				}
+
+				updateBufferProgress() {
+					const progress = this.getBufferHealth() * 100;
+					this.bufferIndicator.querySelector('.buffer-progress').style.width = `${progress}%`;
+				}
+
+				switchQuality(quality) {
+					if (this.currentQuality === quality) return;
+					this.currentQuality = quality;
+					this.updateQualityIndicator();
+				}
+
+				updateQualityIndicator() {
+					this.qualityIndicator.textContent = `${this.currentQuality}p`;
+				}
+
+				formatSize(bytes) {
+					const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+					if (bytes === 0) return '0 Byte';
+					const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+					return Math.round(bytes / Math.pow(1024, i)) + ' ' + sizes[i];
+				}
+
+				updateActiveItem(button) {
+					this.playlist.querySelectorAll('.playlist-item').forEach(item => {
+						item.classList.remove('active');
+					});
+					button.classList.add('active');
+				}
+			}
+
+			document.addEventListener('DOMContentLoaded', () => {
+				new VideoPlayerPro();
+			});
+		</script>
+	</body>
+</html>
