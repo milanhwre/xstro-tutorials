@@ -4,6 +4,9 @@
   "type": "module",
   "description": "Website for Xstro tutorials",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "repository": "https://github.com/AstroX11/xstro-tutorials",
   "author": "AstroX11 <danielfx0012@gmail.com>",
   "license": "MIT",
